@@ -1,7 +1,6 @@
 import base64
 import json
 import os
-
 import requests
 from PyQt5.QtWidgets import (QMainWindow, QLineEdit, QPushButton, QVBoxLayout,
                              QWidget, QTextEdit, QTabWidget, QDesktopWidget, QTableWidget, QTableWidgetItem,
@@ -104,8 +103,8 @@ class BrowserApp(QMainWindow):
         table_layout = QVBoxLayout()
 
         self.data_table = QTableWidget(self)
-        self.data_table.setColumnCount(4)
-        self.data_table.setHorizontalHeaderLabels(["Product Name", "Main Image", "Price", "Reviews"])
+        self.data_table.setColumnCount(5)
+        self.data_table.setHorizontalHeaderLabels(["Product Name", "Main Image", "Price", "Reviews", "Product URL"])
         table_layout.addWidget(self.data_table)
 
         self.table_tab.setLayout(table_layout)
@@ -127,13 +126,6 @@ class BrowserApp(QMainWindow):
         self.wp_html_content = QTextEdit(self)
         wp_html_layout.addWidget(self.wp_html_content)
 
-        self.wp_html_tab.setLayout(wp_html_layout)
-        self.tabs.addTab(self.wp_html_tab, "WordPress HTML")
-
-        self.setCentralWidget(self.tabs)
-
-        # Inside the initUI method, under the WordPress HTML Tab section
-
         # Category Dropdown
         self.category_dropdown = QComboBox(self)
         wp_html_layout.addWidget(QLabel("Select Category:"))
@@ -143,6 +135,9 @@ class BrowserApp(QMainWindow):
         self.post_button = QPushButton('Post to WordPress', self)
         self.post_button.clicked.connect(self.post_to_wordpress)
         wp_html_layout.addWidget(self.post_button)
+
+        self.wp_html_tab.setLayout(wp_html_layout)
+        self.tabs.addTab(self.wp_html_tab, "WordPress HTML")
 
         # Settings Tab
         self.settings_tab = QWidget()
@@ -205,6 +200,8 @@ class BrowserApp(QMainWindow):
             categories = response.json()
             for category in categories:
                 self.category_dropdown.addItem(category['name'], category['id'])
+        else:
+            QMessageBox.warning(self, "Error", "Failed to fetch categories from WordPress.")
 
     def load_settings(self):
         if os.path.exists(self.settings_file):
@@ -284,7 +281,8 @@ class BrowserApp(QMainWindow):
 
     def render_html_content(self):
         bootstrap_cdn = '<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css" rel="stylesheet">'
-        html_content = bootstrap_cdn + self.wp_html_content.toPlainText().strip()  # Added .strip() here
+        font_awesome_cdn = '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">'
+        html_content = font_awesome_cdn + bootstrap_cdn + self.wp_html_content.toPlainText().strip()
         self.rendered_html_browser.setHtml(html_content)
 
     def center(self):
@@ -300,32 +298,32 @@ class BrowserApp(QMainWindow):
         self.browser.load(QUrl(url))
 
     def extract_data(self):
+        self.prompted = False  # Reset the prompted flag
 
-        def extract_data(self):
-            # Product Name
-            js_product_name = """
-            document.querySelector("#productTitle") ? document.querySelector("#productTitle").textContent.trim() : ""
-            """
-            self.browser.page().runJavaScript(js_product_name, self.store_and_check_data('product_name'))
+        # Product Name
+        js_product_name = """
+        document.querySelector("#productTitle") ? document.querySelector("#productTitle").textContent.trim() : ""
+        """
+        self.browser.page().runJavaScript(js_product_name, self.store_and_check_data('product_name'))
 
-            # Main Image
-            js_main_image = """
-            document.querySelector("#landingImage") ? document.querySelector("#landingImage").src : ""
-            """
-            self.browser.page().runJavaScript(js_main_image, self.store_and_check_data('main_image'))
+        # Main Image
+        js_main_image = """
+        document.querySelector("#landingImage") ? document.querySelector("#landingImage").src : ""
+        """
+        self.browser.page().runJavaScript(js_main_image, self.store_and_check_data('main_image'))
 
-            # Price
-            js_price = """
-            document.querySelector(".a-price .a-offscreen") ? document.querySelector(".a-price .a-offscreen").textContent.trim() :
-            (document.querySelector(".a-price .a-price-whole") ? document.querySelector(".a-price .a-price-whole").textContent.trim() : "")
-            """
-            self.browser.page().runJavaScript(js_price, self.store_and_check_data('price'))
+        # Price
+        js_price = """
+        document.querySelector(".a-price .a-offscreen") ? document.querySelector(".a-price .a-offscreen").textContent.trim() :
+        (document.querySelector(".a-price .a-price-whole") ? document.querySelector(".a-price .a-price-whole").textContent.trim() : "")
+        """
+        self.browser.page().runJavaScript(js_price, self.store_and_check_data('price'))
 
-            # Reviews
-            js_reviews = """
-            document.querySelector("#acrCustomerReviewText") ? document.querySelector("#acrCustomerReviewText").textContent.trim() : ""
-            """
-            self.browser.page().runJavaScript(js_reviews, self.store_and_check_data('reviews'))
+        # Reviews
+        js_reviews = """
+        document.querySelector("#acrCustomerReviewText") ? document.querySelector("#acrCustomerReviewText").textContent.trim() : ""
+        """
+        self.browser.page().runJavaScript(js_reviews, self.store_and_check_data('reviews'))
 
     def fetch_html_content(self):
         self.browser.page().toHtml(self.display_html_content)
@@ -340,11 +338,18 @@ class BrowserApp(QMainWindow):
                 self.current_data[key] = result
                 self.result_text.append(
                     f"[INFO] Extracted {key}: {result}")  # Display extracted data in the "Extracted Data" tab
-                if len(self.current_data) == 4 and not self.prompted:  # All data points found
-                    self.prompt_extraction()
-                    self.prompted = True
             else:
                 self.result_text.append(f"[WARNING] Failed to extract {key}")  # Display warning for missing data
+
+            # Check if all data points are present
+            required_data_points = ['product_name', 'main_image', 'price', 'reviews']
+            if all(point in self.current_data for point in required_data_points) and not self.prompted:
+                self.prompted = True
+                self.prompt_extraction()
+
+            # Add a newline after the last required data point is extracted
+            if key == required_data_points[-1]:
+                self.result_text.append("\n")
 
         return callback
 
@@ -371,42 +376,60 @@ class BrowserApp(QMainWindow):
         self.data_table.setItem(rows, 1, QTableWidgetItem(self.current_data['main_image']))
         self.data_table.setItem(rows, 2, QTableWidgetItem(self.current_data['price']))
         self.data_table.setItem(rows, 3, QTableWidgetItem(self.current_data['reviews']))
+        self.data_table.setItem(rows, 4, QTableWidgetItem(self.url_entry.text()))  # Add the product URL to the data table
 
-        # Construct the Amazon URL with the affiliate tag
-        amazon_base_url = "https://www.amazon.co.uk"
-        product_path = "/".join(self.url_entry.text().split("/")[3:6])  # Extracting the essential part of the URL
-        affiliate_tag = f"?tag={self.amazon_affiliate_id}"
-        amazon_url = amazon_base_url + "/" + product_path + "/" + affiliate_tag
+        # Construct WordPress HTML based on the entire data table
+        table_rows_html = ""
+        for i in range(self.data_table.rowCount()):
+            product_name = self.data_table.item(i, 0).text()
+            main_image = self.data_table.item(i, 1).text()
+            price = self.data_table.item(i, 2).text()
+            reviews = self.data_table.item(i, 3).text()
+            product_url = self.data_table.item(i, 4).text()  # Get the product URL from the data table
 
-        # Add a Bootstrap-styled link that looks like a button to the table with Font Awesome cart icon
-        amazon_link = f'<a href="{amazon_url}" class="btn btn-success" target="_blank"><i class="fas fa-shopping-cart"></i> Check Price</a>'
-        self.data_table.setItem(rows, 4, QTableWidgetItem(amazon_link))
+            # Construct the Amazon URL with the affiliate tag for each product
+            amazon_base_url = "https://www.amazon.co.uk"
+            product_path = "/".join(product_url.split("/")[3:6])  # Extracting the essential part of the URL
+            affiliate_tag = f"?tag={self.amazon_affiliate_id}"
+            amazon_url = amazon_base_url + "/" + product_path + "/" + affiliate_tag
 
-        # Construct WordPress HTML based on selected template
-        if self.selected_template == "Comparison Tables":
-            html_content = f"""
-            <div class="table-responsive">
-                <table class="table table-bordered table-striped table-hover">
-                    <thead>
-                        <tr>
-                            <th>Product Image</th>
-                            <th>Product Name</th>
-                            <th>Price</th>
-                            <th>Reviews</th>
-                            <th>&nbsp;</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td><img src="{self.current_data['main_image']}" alt="{self.current_data['product_name']}" class="img-thumbnail"></td>
-                            <td>{self.current_data['product_name']}</td>
-                            <td>{self.current_data['price']}</td>
-                            <td>{self.current_data['reviews']}</td>
-                            <td>{amazon_link}</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
+            # Add a Bootstrap-styled link that looks like a button to the table with Font Awesome cart icon for each product
+            amazon_link = f'<a href="{amazon_url}" class="btn btn-success" target="_blank"><i class="fas fa-shopping-cart"></i> Check Price</a>'
+
+            table_rows_html += f"""
+            <tr>
+                <td><img src="{main_image}" alt="{product_name}" class="img-thumbnail" width="100"></td>
+                <td>{product_name}</td>
+                <td>{price}</td>
+                <td>{reviews}</td>
+                <td class="text-end">
+                    <div class="mt-2">
+                        {amazon_link}
+                    </div>
+                </td>
+            </tr>
             """
-            self.wp_html_content.setPlainText(html_content)
 
+        html_content = f"""
+        <div class="table-responsive">
+            <table class="table table-bordered table-striped table-hover">
+                <thead>
+                    <tr>
+                        <th>Image</th>
+                        <th>Name</th>
+                        <th>Price</th>
+                        <th>Reviews</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {table_rows_html}
+                </tbody>
+            </table>
+        </div>
+        """
+
+        self.wp_html_content.setPlainText(html_content)
+
+        # Reset the current_data dictionary to ensure it's empty for the next product
+        self.current_data = {}
