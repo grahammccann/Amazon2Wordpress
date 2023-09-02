@@ -57,7 +57,7 @@ class BrowserApp(QMainWindow):
             response = openai.ChatCompletion.create(
                 model="gpt-3.5-turbo",
                 messages=[
-                    {"role": "user", "content": f"Provide 5 bullet points about the product: {product_name}"}
+                    {"role": "user", "content": f"Provide 5 bullet points (in ordered list format) about the product: {product_name}"}
                 ]
             )
             return markdown2.markdown(response.choices[0].message.content)
@@ -140,9 +140,9 @@ class BrowserApp(QMainWindow):
         table_layout = QVBoxLayout()
 
         self.data_table = QTableWidget(self)
-        self.data_table.setColumnCount(6)
+        self.data_table.setColumnCount(7)
         self.data_table.setHorizontalHeaderLabels(
-            ["Product Name", "Main Image", "Price", "Reviews", "Product URL", "Bullet Points"])
+            ["Product Name", "Main Image", "Price", "Reviews", "Product URL", "Bullet Points", "ASIN"])
         table_layout.addWidget(self.data_table)
 
         self.table_tab.setLayout(table_layout)
@@ -369,7 +369,9 @@ class BrowserApp(QMainWindow):
             asin_match = re.search(r'/dp/(\w+)/', product_url)
             if asin_match:
                 asin = asin_match.group(1)
+                print(f"Extracted ASIN: {asin}")  # Add this line for debugging
                 self.current_data['asin'] = asin
+
         except Exception as e:
             print(f"Error in extract_data: {e}")
 
@@ -417,6 +419,9 @@ class BrowserApp(QMainWindow):
             if retval == QMessageBox.Yes:
                 product_name = self.current_data['product_name']
 
+                # Initialize product_info to None
+                product_info = None
+
                 # Check if the product name or ASIN is in the cache
                 if product_name in self.product_cache:
                     # Use the bullet points from the cache
@@ -428,9 +433,17 @@ class BrowserApp(QMainWindow):
                     info_msg.setText("Using already saved data from cache. Not querying OpenAI.")
                     info_msg.setWindowTitle("Information")
                     info_msg.exec_()
+
+                    # Debug print statement
+                    print("Using saved description from cache.")
+
                 else:
+
                     # Generate bullet points using AI
                     product_info = self.generate_ai_product_data(product_name)
+
+                    # Debug print statement
+                    print("Using AI-generated description.")
 
                 if product_info:
                     self.result_text.append(f"[INFO] AI Generated Product Info: {product_info}")
@@ -456,17 +469,16 @@ class BrowserApp(QMainWindow):
             self.data_table.setItem(rows, 2, QTableWidgetItem(str(self.current_data.get('price', ''))))
             self.data_table.setItem(rows, 3, QTableWidgetItem(str(self.current_data.get('reviews', ''))))
             self.data_table.setItem(rows, 4, QTableWidgetItem(str(self.url_entry.text())))
+            self.data_table.setItem(rows, 5,
+                                    QTableWidgetItem(str(self.current_data.get('product_info', ''))))  # Bullet Points
+            print(f"ASIN before adding to table: {self.current_data.get('asin', 'N/A')}")  # Debugging line
+            self.data_table.setItem(rows, 6, QTableWidgetItem(str(self.current_data.get('asin', ''))))  # ASIN
 
             # Save to JSON
             self.save_to_cache(self.current_data.get('product_name', ''), {
                 'asin': self.current_data.get('asin', ''),
                 'bullet_points': self.current_data.get('product_info', '')
             })
-
-            product_info = self.generate_ai_product_data(self.current_data.get('product_name', ''))
-            self.current_data['product_info'] = product_info
-            bullet_points_html = product_info.replace("\n", "<br>")
-            self.data_table.setItem(rows, 5, QTableWidgetItem(product_info))
 
             self.generate_wp_html()
 
@@ -512,9 +524,7 @@ class BrowserApp(QMainWindow):
                         <img src="{main_image}" alt="{product_name}" class="product-image">
                     </a>
                     <div class="product-details">
-                        <a href="{amazon_url}" target="_blank" class="product-link">
                             <h2 class="product-name">{product_name}</h2>
-                        </a>
                         <div class="product-price-reviews">
                             {price_html}
                             {reviews_html}
