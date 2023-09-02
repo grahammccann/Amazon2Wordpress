@@ -32,6 +32,18 @@ class BrowserApp(QMainWindow):
         self.initUI()
         self.load_settings()
         self.browser.urlChanged.connect(self.update_url_textbox)
+        self.cache_file = "product_cache.json"
+        self.product_cache = self.load_cache()
+
+    def load_cache(self):
+        if os.path.exists(self.cache_file):
+            with open(self.cache_file, 'r') as file:
+                return json.load(file)
+        return {}
+
+    def save_cache(self):
+        with open(self.cache_file, 'w') as file:
+            json.dump(self.product_cache, file, indent=4)
 
     def generate_ai_product_data(self, product_name):
         try:
@@ -50,6 +62,7 @@ class BrowserApp(QMainWindow):
         self.setWindowTitle('Embedded Browser - graham23s@hotmail.com')
         self.setGeometry(100, 100, 800, 600)
         self.center()
+
         self.tabs = QTabWidget()
 
         # Browser Tab
@@ -136,74 +149,86 @@ class BrowserApp(QMainWindow):
         self.post_title_entry.setPlaceholderText('Enter Post Title...')
         wp_html_layout.addWidget(self.post_title_entry)
 
+        # WordPress Username
+        self.wp_username_label = QLabel("WordPress Username:", self)
+        wp_html_layout.addWidget(self.wp_username_label)
+
+        self.wp_username_entry = QLineEdit(self)
+        wp_html_layout.addWidget(self.wp_username_entry)
+
+        # WordPress Password
+        self.wp_password_label = QLabel("WordPress Password:", self)
+        wp_html_layout.addWidget(self.wp_password_label)
+
+        self.wp_password_entry = QLineEdit(self)
+        self.wp_password_entry.setEchoMode(QLineEdit.Password)
+        wp_html_layout.addWidget(self.wp_password_entry)
+
+        # Category Dropdown
+        self.category_label = QLabel("Select Category:", self)
+        wp_html_layout.addWidget(self.category_label)
+
+        self.category_dropdown = QComboBox(self)
+        wp_html_layout.addWidget(self.category_dropdown)
+
+        # WordPress Site URL
+        self.wp_site_url_label = QLabel("WordPress Site URL:", self)
+        wp_html_layout.addWidget(self.wp_site_url_label)
+
+        self.wp_site_url_entry = QLineEdit(self)
+        wp_html_layout.addWidget(self.wp_site_url_entry)
+
+        # Amazon Affiliate ID
+        self.amazon_affiliate_id_label = QLabel("Amazon Affiliate ID:", self)
+        wp_html_layout.addWidget(self.amazon_affiliate_id_label)
+
+        self.amazon_affiliate_id_entry = QLineEdit(self)
+        wp_html_layout.addWidget(self.amazon_affiliate_id_entry)
+
         self.template_dropdown = QComboBox(self)
         self.template_dropdown.addItems(self.templates)
         self.template_dropdown.currentIndexChanged.connect(self.template_selected)
         wp_html_layout.addWidget(self.template_dropdown)
 
+        # Add Amazon Domain Dropdown
+        wp_html_layout.addWidget(QLabel("Amazon Domain:"))
+        self.amazon_domain_dropdown = QComboBox(self)
+        self.amazon_domain_dropdown.addItems(["amazon.com", "amazon.co.uk", "amazon.ca", "amazon.com.au", "amazon.in"])
+        wp_html_layout.addWidget(self.amazon_domain_dropdown)
+
         self.wp_html_content = QTextEdit(self)
         wp_html_layout.addWidget(self.wp_html_content)
 
-        # Category Dropdown
-        wp_html_layout.addWidget(QLabel("Select Category:"))
-        self.category_dropdown = QComboBox(self)
-        wp_html_layout.addWidget(self.category_dropdown)
-
-        # Button Text Entry
-        wp_html_layout.addWidget(QLabel("Button Text:"))
-        self.button_text_entry = QLineEdit(self)
-        self.button_text_entry.setPlaceholderText('e.g. View on Amazon')
-        wp_html_layout.addWidget(self.button_text_entry)
-
-        # Show Price Checkbox
-        self.show_price_checkbox = QCheckBox("Show Price")
+        self.show_price_checkbox = QCheckBox("Show Price", self)
         self.show_price_checkbox.setChecked(True)
         wp_html_layout.addWidget(self.show_price_checkbox)
 
-        # Post Button
-        self.post_button = QPushButton('Post to WordPress', self)
-        self.post_button.clicked.connect(self.post_to_wordpress)
-        wp_html_layout.addWidget(self.post_button)
+        self.button_text_label = QLabel("Button Text:", self)
+        wp_html_layout.addWidget(self.button_text_label)
+
+        self.button_text_entry = QLineEdit(self)
+        self.button_text_entry.setPlaceholderText('View on Amazon')
+        wp_html_layout.addWidget(self.button_text_entry)
+
+        self.generate_wp_html_button = QPushButton('Generate WordPress HTML', self)
+        self.generate_wp_html_button.clicked.connect(self.generate_wp_html)
+        wp_html_layout.addWidget(self.generate_wp_html_button)
+
+        # Add the "Post to WordPress" button
+        self.post_to_wp_button = QPushButton('Post to WordPress', self)
+        self.post_to_wp_button.clicked.connect(self.post_to_wordpress)
+        wp_html_layout.addWidget(self.post_to_wp_button)
 
         self.wp_html_tab.setLayout(wp_html_layout)
         self.tabs.addTab(self.wp_html_tab, "WordPress HTML")
 
-        # Settings Tab
-        self.settings_tab = QWidget()
-        settings_layout = QVBoxLayout()
-
-        # Use QFormLayout for the settings
-        form_layout = QFormLayout()
-
-        self.amazon_domain_dropdown = QComboBox(self)
-        self.amazon_domain_dropdown.addItems(["amazon.co.uk", "amazon.com", "amazon.de"])
-        form_layout.addRow("Select Amazon Domain:", self.amazon_domain_dropdown)
-
-        self.wp_username_entry = QLineEdit(self)
-        form_layout.addRow("WordPress Username:", self.wp_username_entry)
-
-        self.wp_password_entry = QLineEdit(self)
-        self.wp_password_entry.setEchoMode(QLineEdit.Password)
-        form_layout.addRow("WordPress Password:", self.wp_password_entry)
-
-        self.wp_site_url_entry = QLineEdit(self)
-        form_layout.addRow("WordPress Site URL:", self.wp_site_url_entry)
-
-        self.amazon_affiliate_id_entry = QLineEdit(self)
-        form_layout.addRow("Amazon Affiliate ID:", self.amazon_affiliate_id_entry)
-
-        settings_layout.addLayout(form_layout)
-
-        self.save_settings_button = QPushButton("Save Settings", self)
-        self.save_settings_button.clicked.connect(self.save_settings)
-        settings_layout.addWidget(self.save_settings_button)
-
-        self.settings_tab.setLayout(settings_layout)
-        self.tabs.addTab(self.settings_tab, "Settings")
-
         self.setCentralWidget(self.tabs)
 
     def post_to_wordpress(self):
+        # Check if post title is empty
+        if not self.post_title_entry.text().strip():
+            QMessageBox.warning(self, "Missing Information", "Please provide a post title.")
+            return
         try:
             api_endpoint = f"{self.wp_site_url}/wp-json/wp/v2/posts"
             headers = {
@@ -298,6 +323,7 @@ class BrowserApp(QMainWindow):
         self.browser.load(QUrl(url))
 
     def extract_data(self):
+        self.current_data = {}
 
         current_url = self.url_entry.text()
         if "amazon.co.uk" not in current_url:
@@ -396,13 +422,15 @@ class BrowserApp(QMainWindow):
         self.data_table.setItem(rows, 3, QTableWidgetItem(self.current_data['reviews']))
         self.data_table.setItem(rows, 4, QTableWidgetItem(self.url_entry.text()))
 
-        # Generate AI bullet points for the product
         product_info = self.generate_ai_product_data(self.current_data['product_name'])
-        self.current_data['product_info'] = product_info  # Update the dictionary with the new bullet points
+        self.current_data['product_info'] = product_info
         bullet_points_html = product_info.replace("\n", "<br>")
-        self.data_table.setItem(rows, 5, QTableWidgetItem(product_info))  # Store bullet points in the table
+        self.data_table.setItem(rows, 5, QTableWidgetItem(product_info))
 
-        # Construct WordPress HTML based on the entire data table
+        self.generate_wp_html()
+
+    def generate_wp_html(self):
+
         product_boxes_html = ""
         for i in range(self.data_table.rowCount()):
             product_name = self.data_table.item(i, 0).text()
@@ -412,7 +440,7 @@ class BrowserApp(QMainWindow):
             product_url = self.data_table.item(i, 4).text()
             product_info = self.data_table.item(i, 5).text() if self.data_table.item(i, 5) else ''
 
-            amazon_base_url = f"https://{self.amazon_domain}"
+            amazon_base_url = f"https://{self.amazon_domain_dropdown.currentText()}"
             product_path = "/".join(product_url.split("/")[3:-1])
             amazon_url = f"{amazon_base_url}/{product_path}/?tag={self.amazon_affiliate_id}"
 
@@ -420,83 +448,105 @@ class BrowserApp(QMainWindow):
             show_price = self.show_price_checkbox.isChecked()
             price_html = f'<span class="product-price">{price}</span>' if show_price else ""
 
+            ribbon_html = f'<div class="product-ribbon">#{i + 1} Best Seller</div>' if i < 2 else ""
+
             product_boxes_html += f"""
                 <div class="product-container">
-                    <img src="{main_image}" alt="{product_name}" class="product-image">
+                    {ribbon_html}
+                    <a href="{amazon_url}" target="_blank" class="product-image-link">
+                        <img src="{main_image}" alt="{product_name}" class="product-image">
+                    </a>
                     <div class="product-details">
-                        <h2 class="product-name">{product_name}</h2>
+                        <a href="{amazon_url}" target="_blank" class="product-link">
+                            <h2 class="product-name">{product_name}</h2>
+                        </a>
                         <div class="product-price-reviews">
-                            {price_html}
+                            <span class="product-price">{price_html}</span>
                             <span class="product-reviews">{reviews}</span>
                         </div>
-                        <ul class="product-bullet-points">{bullet_points_html}</ul>
+                        <ul class="product-bullet-points">{product_info}</ul>
                         <a href="{amazon_url}" target="_blank" class="view-on-amazon"><i class="fas fa-shopping-cart"></i> {button_text}</a>
                     </div>
                 </div>
             """
 
-        wp_html = f"""
-            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.1/css/all.min.css">
-            <style>
-                .product-container {{
-                    width: 80%; 
-                    max-width: 600px; 
-                    border: 1px solid #ddd;
-                    padding: 20px; 
-                    font-family: Arial, sans-serif;
-                    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-                    margin: 20px auto; 
-                }}
-                .product-image {{
-                    width: 100%;
-                    height: auto;
-                    display: block;
-                    margin-bottom: 20px; 
-                }}
-                .product-name {{
-                    font-size: 20px; 
-                    font-weight: bold;
-                    margin-bottom: 15px; 
-                }}
-                .product-price-reviews {{
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                }}
-                .product-price {{
-                    color: #B12704;
-                    font-size: 18px; 
-                    margin-right: 10px; 
-                }}
-                .product-reviews {{
-                    font-size: 16px; 
-                }}
-                .product-bullet-points {{
-                    list-style-type: disc;
-                    padding-left: 30px; 
-                    font-size: 16px; 
-                    margin-bottom: 20px; 
-                }}
-                .view-on-amazon {{
-                    display: block;
-                    width: 100%;
-                    padding: 12px; 
-                    background-color: #FEBD69;
-                    text-align: center;
-                    color: white;
-                    text-decoration: none;
-                    border-radius: 4px;
-                    font-size: 18px; 
-                }}
-                .view-on-amazon:hover {{
-                    background-color: #f5a623;
-                }}
-                .view-on-amazon i {{
-                    margin-right: 8px; 
-                }}
-            </style>
-            {product_boxes_html}
-        """
+            wp_html = f"""
+                <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.1/css/all.min.css">
+                <style>
+                    *, *::before, *::after {{
+                        box-sizing: border-box;
+                    }}
+                    .product-container {{
+                        width: 100%;
+                        border: 1px solid #ddd;
+                        padding: 20px;
+                        font-family: Arial, sans-serif;
+                        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+                        margin: 20px auto;
+                        position: relative;
+                    }}
+                    .product-ribbon {{
+                        position: absolute;
+                        left: 0; top: 0;
+                        z-index: 1;
+                        background-color: #FF6347;
+                        color: white;
+                        padding: 5px 15px;
+                        font-size: 14px;
+                        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                    }}
+                    .product-image {{
+                        width: 100%;
+                        height: auto;
+                        display: block;
+                        margin-bottom: 20px;
+                    }}
+                    .product-link {{
+                        text-decoration: none;
+                        color: inherit;
+                    }}
+                    .product-name {{
+                        font-size: 20px;
+                        font-weight: bold;
+                        margin-bottom: 15px;
+                    }}
+                    .product-price-reviews {{
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        margin-bottom: 15px;
+                    }}
+                    .product-price {{
+                        font-size: 18px;
+                        color: #555;
+                        font-weight: bold;
+                    }}
+                    .product-reviews {{
+                        font-size: 16px;
+                        color: #777;
+                    }}
+                    .product-bullet-points {{
+                        list-style: square;  /* Changed from disc to square */
+                        padding-left: 20px;
+                        margin-bottom: 20px;
+                    }}
+                    .view-on-amazon {{
+                        display: block;
+                        width: 100%;
+                        padding: 12px; 
+                        background-color: #FEBD69;
+                        text-align: center;
+                        color: white;
+                        text-decoration: none;
+                        border-radius: 4px;
+                        font-size: 18px; 
+                    }}
+                    .view-on-amazon:hover {{
+                        background-color: #f5a623;
+                    }}
+                </style>
+                {product_boxes_html}
+            """
 
         self.wp_html_content.setPlainText(wp_html)
 
