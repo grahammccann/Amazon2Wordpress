@@ -13,6 +13,7 @@ from PyQt5.QtWidgets import (QMainWindow, QLineEdit, QPushButton, QVBoxLayout, Q
 from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEngineProfile, QWebEnginePage
 from PyQt5.QtCore import QUrl
 from PyQt5.QtWidgets import QCheckBox
+from PyQt5.QtWidgets import QMessageBox
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -38,6 +39,12 @@ class BrowserApp(QMainWindow):
         self.cache_file = "product_cache.json"
         self.product_cache = self.load_cache()
 
+    def update_generate_article_button_state(self):
+        if not self.wp_html_content.toPlainText().strip():
+            self.generate_article_button.setDisabled(True)
+        else:
+            self.generate_article_button.setDisabled(False)
+
     def load_cache(self):
         if os.path.exists(self.cache_file):
             with open(self.cache_file, 'r') as file:
@@ -51,6 +58,42 @@ class BrowserApp(QMainWindow):
     def save_cache(self):
         with open(self.cache_file, 'w') as file:
             json.dump(self.product_cache, file, indent=4)
+
+    def generate_article(self):
+        prompt = self.article_prompt.toPlainText()
+
+        # Extract current content from wp_html_content for context
+        current_content = self.wp_html_content.toPlainText()
+
+        # Combine the current content with the prompt to give more context
+        prompt_with_context = current_content + "\n\n" + prompt
+
+        if not prompt:
+            QMessageBox.warning(self, "Missing Prompt", "Please provide a prompt for the article.")
+            return
+        try:
+            response = openai.ChatCompletion.create(
+                model="gpt-4",  # Use GPT-4 model
+                messages=[
+                    {"role": "user", "content": prompt_with_context}
+                ]
+            )
+            article_content = markdown2.markdown(response.choices[0].message.content)
+
+            # Extract the <h1> heading from the generated content
+            h1_heading = re.search(r"<h1.*?>.*?</h1>", article_content)
+            if h1_heading:
+                h1_heading = h1_heading.group()
+                article_content = article_content.replace(h1_heading, "")
+
+            # Combine the <h1> heading, current content, and the rest of the article content
+            organized_content = h1_heading + "\n\n" + current_content + "\n\n" + article_content
+
+            # Set the organized content back to the QTextEdit
+            self.wp_html_content.setPlainText(organized_content)
+
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"An error occurred: {e}")
 
     def generate_ai_product_data(self, product_name):
         try:
@@ -152,6 +195,23 @@ class BrowserApp(QMainWindow):
         self.wp_html_tab = QWidget()
         wp_html_layout = QVBoxLayout()
 
+        # Article Prompt
+        self.article_prompt_label = QLabel("Article Prompt:", self)
+        wp_html_layout.addWidget(self.article_prompt_label)
+
+        self.article_prompt = QTextEdit(self)
+        self.article_prompt.setPlainText(
+            "Write an SEO-rich article of about 800-1000 words based on the topic and context provided in the table "
+            "tab. Structure the content with a clear introduction, main content discussing benefits and key features, "
+            "and a conclusion offering actionable advice. The tone should be friendly and engaging. Do not mention "
+            "Amazon or link to it, ensure the content is unique, and use Markdown formatting."
+        )
+        wp_html_layout.addWidget(self.article_prompt)
+
+        self.generate_article_button = QPushButton('Generate Article', self)
+        self.generate_article_button.clicked.connect(self.generate_article)
+        wp_html_layout.addWidget(self.generate_article_button)
+
         self.post_title_entry = QLineEdit(self)
         self.post_title_entry.setPlaceholderText('Enter Post Title...')
         wp_html_layout.addWidget(self.post_title_entry)
@@ -206,6 +266,9 @@ class BrowserApp(QMainWindow):
         self.wp_html_content = QTextEdit(self)
         wp_html_layout.addWidget(self.wp_html_content)
 
+        # Connect the textChanged signal here, after defining wp_html_content
+        self.wp_html_content.textChanged.connect(self.update_generate_article_button_state)
+
         # Existing code
         self.show_price_checkbox = QCheckBox("Show Price", self)
         self.show_price_checkbox.setChecked(True)
@@ -236,6 +299,7 @@ class BrowserApp(QMainWindow):
         self.tabs.addTab(self.wp_html_tab, "WordPress HTML")
 
         self.setCentralWidget(self.tabs)
+        self.update_generate_article_button_state()
 
     def post_to_wordpress(self):
         # Check if post title is empty
