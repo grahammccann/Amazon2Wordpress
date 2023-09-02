@@ -206,9 +206,15 @@ class BrowserApp(QMainWindow):
         self.wp_html_content = QTextEdit(self)
         wp_html_layout.addWidget(self.wp_html_content)
 
+        # Existing code
         self.show_price_checkbox = QCheckBox("Show Price", self)
         self.show_price_checkbox.setChecked(True)
         wp_html_layout.addWidget(self.show_price_checkbox)
+
+        # Add this new checkbox
+        self.show_rating_checkbox = QCheckBox("Show Rating", self)
+        self.show_rating_checkbox.setChecked(True)
+        wp_html_layout.addWidget(self.show_rating_checkbox)
 
         self.button_text_label = QLabel("Button Text:", self)
         wp_html_layout.addWidget(self.button_text_label)
@@ -476,7 +482,6 @@ class BrowserApp(QMainWindow):
         self.save_cache()
 
     def generate_wp_html(self):
-
         product_boxes_html = ""
         for i in range(self.data_table.rowCount()):
             product_name = self.data_table.item(i, 0).text()
@@ -494,6 +499,10 @@ class BrowserApp(QMainWindow):
             show_price = self.show_price_checkbox.isChecked()
             price_html = f'<span class="product-price">{price}</span>' if show_price else ""
 
+            # Check the state of the show_rating_checkbox
+            show_rating = self.show_rating_checkbox.isChecked()
+            reviews_html = f'<span class="product-reviews">{reviews}</span>' if show_rating else ""
+
             ribbon_html = f'<div class="product-ribbon">#{i + 1} Best Seller</div>' if i < 2 else ""
 
             product_boxes_html += f"""
@@ -507,94 +516,97 @@ class BrowserApp(QMainWindow):
                             <h2 class="product-name">{product_name}</h2>
                         </a>
                         <div class="product-price-reviews">
-                            <span class="product-price">{price_html}</span>
-                            <span class="product-reviews">{reviews}</span>
+                            {price_html}
+                            {reviews_html}
                         </div>
-                        <ul class="product-bullet-points">{product_info}</ul>
+                        <ol class="product-bullet-points">{product_info}</ol>
                         <a href="{amazon_url}" target="_blank" class="view-on-amazon"><i class="fas fa-shopping-cart"></i> {button_text}</a>
                     </div>
                 </div>
             """
 
-            wp_html = f"""
-                <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.1/css/all.min.css">
-                <style>
-                    *, *::before, *::after {{
-                        box-sizing: border-box;
-                    }}
-                    .product-container {{
-                        width: 100%;
-                        border: 1px solid #ddd;
-                        padding: 20px;
-                        font-family: Arial, sans-serif;
-                        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-                        margin: 20px auto;
-                        position: relative;
-                    }}
-                    .product-ribbon {{
-                        position: absolute;
-                        left: 0; top: 0;
-                        z-index: 1;
-                        background-color: #FF6347;
-                        color: white;
-                        padding: 5px 15px;
-                        font-size: 14px;
-                        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-                    }}
-                    .product-image {{
-                        width: 100%;
-                        height: auto;
-                        display: block;
-                        margin-bottom: 20px;
-                    }}
-                    .product-link {{
-                        text-decoration: none;
-                        color: inherit;
-                    }}
-                    .product-name {{
-                        font-size: 20px;
-                        font-weight: bold;
-                        margin-bottom: 15px;
-                    }}
-                    .product-price-reviews {{
-                        display: flex;
-                        justify-content: space-between;
-                        align-items: center;
-                        margin-bottom: 15px;
-                    }}
-                    .product-price {{
-                        font-size: 18px;
-                        color: #555;
-                        font-weight: bold;
-                    }}
-                    .product-reviews {{
-                        font-size: 16px;
-                        color: #777;
-                    }}
-                    .product-bullet-points {{
-                        list-style: square;  /* Changed from disc to square */
-                        padding-left: 20px;
-                        margin-bottom: 20px;
-                    }}
-                    .view-on-amazon {{
-                        display: block;
-                        width: 100%;
-                        padding: 12px; 
-                        background-color: #FEBD69;
-                        text-align: center;
-                        color: white;
-                        text-decoration: none;
-                        border-radius: 4px;
-                        font-size: 18px; 
-                    }}
-                    .view-on-amazon:hover {{
-                        background-color: #f5a623;
-                    }}
-                </style>
-                {product_boxes_html}
-            """
+        wp_html = f"""
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.1/css/all.min.css">
+            <style>
+                *, *::before, *::after {{
+                    box-sizing: border-box;
+                }}
+                .product-container {{
+                    width: 100%;
+                    border: 1px solid #ddd;
+                    padding: 20px;
+                    font-family: Arial, sans-serif;
+                    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+                    margin: 20px auto;
+                    position: relative;
+                }}
+                .product-ribbon {{
+                    position: absolute;
+                    left: 0; top: 0;
+                    z-index: 1;
+                    background-color: #FF6347;
+                    color: white;
+                    padding: 5px 15px;
+                    font-size: 14px;
+                    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                }}
+                .product-image {{
+                    width: 100%;
+                    height: auto;
+                    display: block;
+                    margin-bottom: 20px;
+                }}
+                .product-link {{
+                    text-decoration: none;
+                    color: inherit;
+                }}
+                .product-name {{
+                    font-size: 20px;
+                    font-weight: bold;
+                    margin-bottom: 15px;
+                }}
+                .product-price-reviews {{
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 15px;
+                }}
+                .product-price {{
+                    font-size: 18px;
+                    color: #555;
+                    font-weight: bold;
+                }}
+                .product-reviews {{
+                    font-size: 16px;
+                    color: #777;
+                }}
+                .product-bullet-points {{
+                    list-style-type: decimal;
+                    padding-left: 20px;
+                    margin-bottom: 20px;
+                }}
+                .view-on-amazon {{
+                    display: block;
+                    width: 100%;
+                    padding: 12px; 
+                    background-color: #FEBD69;
+                    text-align: center;
+                    color: white;
+                    text-decoration: none;
+                    border-radius: 4px;
+                    font-size: 18px; 
+                }}
+                .view-on-amazon:hover {{
+                    background-color: #f5a623;
+                }}
+            </style>
+            {product_boxes_html}
+        """
 
         self.wp_html_content.setPlainText(wp_html)
+
+        # Automatically render the WordPress HTML
+        self.render_html_content()
 
 
 if __name__ == '__main__':
