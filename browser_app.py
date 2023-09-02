@@ -1,6 +1,8 @@
 import base64
 import json
 import os
+import re
+
 import openai
 import requests
 import markdown2
@@ -15,6 +17,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 openai.api_key = os.environ["OPENAI_API_KEY"]
+
 
 class BrowserApp(QMainWindow):
     def __init__(self):
@@ -39,6 +42,10 @@ class BrowserApp(QMainWindow):
         if os.path.exists(self.cache_file):
             with open(self.cache_file, 'r') as file:
                 return json.load(file)
+        else:
+            # Create the cache file if it doesn't exist
+            with open(self.cache_file, 'w') as file:
+                json.dump({}, file)
         return {}
 
     def save_cache(self):
@@ -298,13 +305,6 @@ class BrowserApp(QMainWindow):
     def update_url_textbox(self, qurl):
         self.url_entry.setText(qurl.toString())
 
-    def tab_changed(self, index):
-        # Check if the current tab is "Rendered HTML"
-        if self.tabs.tabText(index) == "Rendered HTML":
-            bootstrap_cdn = '<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css" rel="stylesheet">'
-            html_content = bootstrap_cdn + self.wp_html_content.toPlainText().strip()  # Added .strip() here
-            self.rendered_html_browser.setHtml(html_content)
-
     def render_html_content(self):
         bootstrap_cdn = '<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css" rel="stylesheet">'
         html_content = bootstrap_cdn + self.wp_html_content.toPlainText().strip()  # Added .strip() here
@@ -325,36 +325,47 @@ class BrowserApp(QMainWindow):
     def extract_data(self):
         self.current_data = {}
 
-        current_url = self.url_entry.text()
-        if "amazon.co.uk" not in current_url:
-            return  # Not an Amazon product page, so return without extracting data
+        product_url = self.url_entry.text()  # Get the current URL from the url_entry widget
+        domain_from_settings = self.amazon_domain_dropdown.currentText()  # Get the domain from the settings dropdown
+
+        if domain_from_settings not in product_url:
+            return  # Not a product page from the selected domain, so return without extracting data
 
         self.prompted = False  # Reset the prompted flag
 
-        # Product Name
-        js_product_name = """
-        document.querySelector("#productTitle") ? document.querySelector("#productTitle").textContent.trim() : ""
-        """
-        self.browser.page().runJavaScript(js_product_name, self.store_and_check_data('product_name'))
+        try:
+            # Product Name
+            js_product_name = """
+            document.querySelector("#productTitle") ? document.querySelector("#productTitle").textContent.trim() : ""
+            """
+            self.browser.page().runJavaScript(js_product_name, self.store_and_check_data('product_name'))
 
-        # Main Image
-        js_main_image = """
-        document.querySelector("#landingImage") ? document.querySelector("#landingImage").src : ""
-        """
-        self.browser.page().runJavaScript(js_main_image, self.store_and_check_data('main_image'))
+            # Main Image
+            js_main_image = """
+            document.querySelector("#landingImage") ? document.querySelector("#landingImage").src : ""
+            """
+            self.browser.page().runJavaScript(js_main_image, self.store_and_check_data('main_image'))
 
-        # Price
-        js_price = """
-        document.querySelector(".a-price .a-offscreen") ? document.querySelector(".a-price .a-offscreen").textContent.trim() :
-        (document.querySelector(".a-price .a-price-whole") ? document.querySelector(".a-price .a-price-whole").textContent.trim() : "")
-        """
-        self.browser.page().runJavaScript(js_price, self.store_and_check_data('price'))
+            # Price
+            js_price = """
+            document.querySelector(".a-price .a-offscreen") ? document.querySelector(".a-price .a-offscreen").textContent.trim() :
+            (document.querySelector(".a-price .a-price-whole") ? document.querySelector(".a-price .a-price-whole").textContent.trim() : "")
+            """
+            self.browser.page().runJavaScript(js_price, self.store_and_check_data('price'))
 
-        # Reviews
-        js_reviews = """
-        document.querySelector("#acrCustomerReviewText") ? document.querySelector("#acrCustomerReviewText").textContent.trim() : ""
-        """
-        self.browser.page().runJavaScript(js_reviews, self.store_and_check_data('reviews'))
+            # Reviews
+            js_reviews = """
+            document.querySelector("#acrCustomerReviewText") ? document.querySelector("#acrCustomerReviewText").textContent.trim() : ""
+            """
+            self.browser.page().runJavaScript(js_reviews, self.store_and_check_data('reviews'))
+
+            # Extract ASIN number
+            asin_match = re.search(r'/dp/(\w+)/', product_url)
+            if asin_match:
+                asin = asin_match.group(1)
+                self.current_data['asin'] = asin
+        except Exception as e:
+            print(f"Error in extract_data: {e}")
 
     def fetch_html_content(self):
         self.browser.page().toHtml(self.display_html_content)
@@ -390,44 +401,79 @@ class BrowserApp(QMainWindow):
         return callback
 
     def prompt_extraction(self):
-        msg = QMessageBox()
-        msg.setIcon(QMessageBox.Question)
-        msg.setText("All data points found. Do you want to extract the data?")
-        msg.setWindowTitle("Extract Data?")
-        msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
-        retval = msg.exec_()
-        if retval == QMessageBox.Yes:
-            # Generate bullet points using AI
-            product_name = self.current_data['product_name']
-            product_info = self.generate_ai_product_data(product_name)
-            if product_info:
-                self.result_text.append(f"[INFO] AI Generated Product Info: {product_info}")
-                # Store the AI data in current_data
-                self.current_data['product_info'] = product_info
-            self.add_to_table()
+        try:
+            msg = QMessageBox()
+            msg.setIcon(QMessageBox.Question)
+            msg.setText("All data points found. Do you want to extract the data?")
+            msg.setWindowTitle("Extract Data?")
+            msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+            retval = msg.exec_()
+            if retval == QMessageBox.Yes:
+                product_name = self.current_data['product_name']
+
+                # Check if the product name or ASIN is in the cache
+                if product_name in self.product_cache:
+                    # Use the bullet points from the cache
+                    product_info = self.product_cache[product_name]['bullet_points']
+
+                    # Alert with a popup that we're using already saved data
+                    info_msg = QMessageBox()
+                    info_msg.setIcon(QMessageBox.Information)
+                    info_msg.setText("Using already saved data from cache. Not querying OpenAI.")
+                    info_msg.setWindowTitle("Information")
+                    info_msg.exec_()
+                else:
+                    # Generate bullet points using AI
+                    product_info = self.generate_ai_product_data(product_name)
+
+                if product_info:
+                    self.result_text.append(f"[INFO] AI Generated Product Info: {product_info}")
+                    # Store the AI data in current_data
+                    self.current_data['product_info'] = product_info
+                self.add_to_table()
+        except Exception as e:
+            print(f"Error in prompt_extraction: {e}")
 
     def template_selected(self, index):
         self.selected_template = self.templates[index]
 
     def add_to_table(self):
-        rows = self.data_table.rowCount()
-        for i in range(rows):
-            if self.data_table.item(i, 0).text() == self.current_data['product_name']:
-                return  # Duplicate found, do not add
+        try:
+            rows = self.data_table.rowCount()
+            for i in range(rows):
+                if self.data_table.item(i, 0).text() == self.current_data.get('product_name', ''):
+                    return  # Duplicate found, do not add
 
-        self.data_table.insertRow(rows)
-        self.data_table.setItem(rows, 0, QTableWidgetItem(self.current_data['product_name']))
-        self.data_table.setItem(rows, 1, QTableWidgetItem(self.current_data['main_image']))
-        self.data_table.setItem(rows, 2, QTableWidgetItem(self.current_data['price']))
-        self.data_table.setItem(rows, 3, QTableWidgetItem(self.current_data['reviews']))
-        self.data_table.setItem(rows, 4, QTableWidgetItem(self.url_entry.text()))
+            self.data_table.insertRow(rows)
+            self.data_table.setItem(rows, 0, QTableWidgetItem(str(self.current_data.get('product_name', ''))))
+            self.data_table.setItem(rows, 1, QTableWidgetItem(str(self.current_data.get('main_image', ''))))
+            self.data_table.setItem(rows, 2, QTableWidgetItem(str(self.current_data.get('price', ''))))
+            self.data_table.setItem(rows, 3, QTableWidgetItem(str(self.current_data.get('reviews', ''))))
+            self.data_table.setItem(rows, 4, QTableWidgetItem(str(self.url_entry.text())))
 
-        product_info = self.generate_ai_product_data(self.current_data['product_name'])
-        self.current_data['product_info'] = product_info
-        bullet_points_html = product_info.replace("\n", "<br>")
-        self.data_table.setItem(rows, 5, QTableWidgetItem(product_info))
+            # Save to JSON
+            self.save_to_cache(self.current_data.get('product_name', ''), {
+                'asin': self.current_data.get('asin', ''),
+                'bullet_points': self.current_data.get('product_info', '')
+            })
 
-        self.generate_wp_html()
+            product_info = self.generate_ai_product_data(self.current_data.get('product_name', ''))
+            self.current_data['product_info'] = product_info
+            bullet_points_html = product_info.replace("\n", "<br>")
+            self.data_table.setItem(rows, 5, QTableWidgetItem(product_info))
+
+            self.generate_wp_html()
+
+        except Exception as e:
+            print(f"Error in add_to_table: {e}")
+
+    def save_to_cache(self, product_name, data):
+        # Check if the product name (or ASIN) is already in the cache
+        if product_name in self.product_cache:
+            return  # Skip saving if it's already in the cache
+
+        self.product_cache[product_name] = data
+        self.save_cache()
 
     def generate_wp_html(self):
 
@@ -554,6 +600,7 @@ class BrowserApp(QMainWindow):
 if __name__ == '__main__':
     import sys
     from PyQt5.QtWidgets import QApplication
+
     app = QApplication(sys.argv)
     window = BrowserApp()
     window.show()
