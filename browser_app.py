@@ -235,6 +235,7 @@ class BrowserApp(QMainWindow):
 
         self.generate_article_button = QPushButton('Generate Article', self)
         self.generate_article_button.clicked.connect(self.generate_article)
+        self.generate_article_button.setDisabled(True)  # This line disables the button
         wp_html_layout.addWidget(self.generate_article_button)
 
         self.post_title_entry = QLineEdit(self)
@@ -270,6 +271,11 @@ class BrowserApp(QMainWindow):
         self.wp_site_url_entry = QLineEdit(self)
         wp_html_layout.addWidget(self.wp_site_url_entry)
 
+        # Save WordPress Credentials Button
+        self.save_wp_credentials_button = QPushButton('Save WordPress Credentials', self)
+        self.save_wp_credentials_button.clicked.connect(self.save_wp_credentials)
+        wp_html_layout.addWidget(self.save_wp_credentials_button)
+
         # Amazon Affiliate ID
         self.amazon_affiliate_id_label = QLabel("Amazon Affiliate ID:", self)
         wp_html_layout.addWidget(self.amazon_affiliate_id_label)
@@ -292,7 +298,7 @@ class BrowserApp(QMainWindow):
         wp_html_layout.addWidget(self.wp_html_content)
 
         # Connect the textChanged signal here, after defining wp_html_content
-        self.wp_html_content.textChanged.connect(self.update_generate_article_button_state)
+        # self.wp_html_content.textChanged.connect(self.update_generate_article_button_state)
 
         # Existing code
         self.show_price_checkbox = QCheckBox("Show Price", self)
@@ -304,8 +310,16 @@ class BrowserApp(QMainWindow):
         self.show_rating_checkbox.setChecked(False)
         wp_html_layout.addWidget(self.show_rating_checkbox)
 
+        # Initialize the label
         self.button_text_label = QLabel("Button Text:", self)
+
+        # Initialize the entry (assuming you're using QLineEdit)
+        self.button_text_entry = QLineEdit(self)
+        self.button_text_entry.setText("Check Price")
+
+        # Add them to the layout
         wp_html_layout.addWidget(self.button_text_label)
+        wp_html_layout.addWidget(self.button_text_entry)
 
         self.button_text_entry = QLineEdit(self)
         self.button_text_entry.setPlaceholderText('View on Amazon')
@@ -342,7 +356,7 @@ class BrowserApp(QMainWindow):
             data = {
                 "title": self.post_title_entry.text(),
                 "content": self.wp_html_content.toPlainText(),
-                "status": "publish",
+                "status": "draft",
                 "categories": [self.category_dropdown.currentData()],
                 "tags": tag_ids
             }
@@ -402,12 +416,12 @@ class BrowserApp(QMainWindow):
             # Fetch categories after loading settings
             self.fetch_categories()
 
-    def save_settings(self):
+    def save_wp_credentials(self):
         self.wp_username = self.wp_username_entry.text()
         self.wp_password = self.wp_password_entry.text()
         self.wp_site_url = self.wp_site_url_entry.text()
         self.amazon_affiliate_id = self.amazon_affiliate_id_entry.text()
-        self.amazon_domain = self.amazon_domain_dropdown.currentText()  # Add this line
+        self.amazon_domain = self.amazon_domain_dropdown.currentText()
 
         # Save to JSON file
         with open(self.settings_file, 'w') as file:
@@ -416,10 +430,11 @@ class BrowserApp(QMainWindow):
                 'wp_password': self.wp_password,
                 'wp_site_url': self.wp_site_url,
                 'amazon_affiliate_id': self.amazon_affiliate_id,
-                'amazon_domain': self.amazon_domain  # Add this line
+                'amazon_domain': self.amazon_domain
             }, file, indent=4)
 
-        QMessageBox.information(self, "Settings Saved", "Your settings have been saved successfully!")
+        QMessageBox.information(self, "Settings Saved", "Your WordPress credentials have been saved successfully!")
+
 
     def update_url_textbox(self, qurl):
         self.url_entry.setText(qurl.toString())
@@ -628,7 +643,7 @@ class BrowserApp(QMainWindow):
             show_rating = self.show_rating_checkbox.isChecked()
             reviews_html = f'<span class="product-reviews">{reviews}</span>' if show_rating else ""
 
-            ribbon_html = f'<div class="product-ribbon">#{i + 1} Best Seller</div>' if i < 2 else ""
+            ribbon_html = f'<div class="product-ribbon">#{i + 1} Best Seller</div>'
 
             product_boxes_html += f"""
                 <div class="product-container">
