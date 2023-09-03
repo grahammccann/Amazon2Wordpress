@@ -220,27 +220,29 @@ class BrowserApp(QMainWindow):
         self.wp_html_tab = QWidget()
         wp_html_layout = QVBoxLayout()
 
-        # Article Prompt
-        self.article_prompt_label = QLabel("Article Prompt:", self)
-        wp_html_layout.addWidget(self.article_prompt_label)
+        self.template_dropdown = QComboBox(self)
+        self.template_dropdown.addItems(self.templates)
+        self.template_dropdown.currentIndexChanged.connect(self.template_selected)
+        wp_html_layout.addWidget(self.template_dropdown)
 
-        self.article_prompt = QTextEdit(self)
-        self.article_prompt.setPlainText(
-            "Write an SEO-rich article of about 800-1000 words based on the topic and context provided in the table "
-            "tab. Structure the content with a clear introduction, main content discussing benefits and key features, "
-            "and a conclusion offering actionable advice. The tone should be friendly and engaging. Do not mention "
-            "Amazon or link to it, ensure the content is unique, and use Markdown formatting."
-        )
-        wp_html_layout.addWidget(self.article_prompt)
-
-        self.generate_article_button = QPushButton('Generate Article', self)
-        self.generate_article_button.clicked.connect(self.generate_article)
-        self.generate_article_button.setDisabled(True)  # This line disables the button
-        wp_html_layout.addWidget(self.generate_article_button)
+        # Post Title
+        self.post_title_label = QLabel("Post Title:", self)
+        wp_html_layout.addWidget(self.post_title_label)
 
         self.post_title_entry = QLineEdit(self)
         self.post_title_entry.setPlaceholderText('Enter Post Title...')
         wp_html_layout.addWidget(self.post_title_entry)
+
+        # Post Body
+        self.post_body_label = QLabel("Post Body:", self)
+        wp_html_layout.addWidget(self.post_body_label)
+
+        self.wp_html_content = QTextEdit(self)
+        wp_html_layout.addWidget(self.wp_html_content)
+
+        self.generate_wp_html_button = QPushButton('Generate WordPress HTML', self)
+        self.generate_wp_html_button.clicked.connect(self.generate_wp_html)
+        wp_html_layout.addWidget(self.generate_wp_html_button)
 
         # WordPress Username
         self.wp_username_label = QLabel("WordPress Username:", self)
@@ -283,22 +285,11 @@ class BrowserApp(QMainWindow):
         self.amazon_affiliate_id_entry = QLineEdit(self)
         wp_html_layout.addWidget(self.amazon_affiliate_id_entry)
 
-        self.template_dropdown = QComboBox(self)
-        self.template_dropdown.addItems(self.templates)
-        self.template_dropdown.currentIndexChanged.connect(self.template_selected)
-        wp_html_layout.addWidget(self.template_dropdown)
-
         # Add Amazon Domain Dropdown
         wp_html_layout.addWidget(QLabel("Amazon Domain:"))
         self.amazon_domain_dropdown = QComboBox(self)
         self.amazon_domain_dropdown.addItems(["amazon.com", "amazon.co.uk", "amazon.ca", "amazon.com.au", "amazon.in"])
         wp_html_layout.addWidget(self.amazon_domain_dropdown)
-
-        self.wp_html_content = QTextEdit(self)
-        wp_html_layout.addWidget(self.wp_html_content)
-
-        # Connect the textChanged signal here, after defining wp_html_content
-        # self.wp_html_content.textChanged.connect(self.update_generate_article_button_state)
 
         # Existing code
         self.show_price_checkbox = QCheckBox("Show Price", self)
@@ -321,14 +312,6 @@ class BrowserApp(QMainWindow):
         wp_html_layout.addWidget(self.button_text_label)
         wp_html_layout.addWidget(self.button_text_entry)
 
-        self.button_text_entry = QLineEdit(self)
-        self.button_text_entry.setPlaceholderText('View on Amazon')
-        wp_html_layout.addWidget(self.button_text_entry)
-
-        self.generate_wp_html_button = QPushButton('Generate WordPress HTML', self)
-        self.generate_wp_html_button.clicked.connect(self.generate_wp_html)
-        wp_html_layout.addWidget(self.generate_wp_html_button)
-
         # Add the "Post to WordPress" button
         self.post_to_wp_button = QPushButton('Post to WordPress', self)
         self.post_to_wp_button.clicked.connect(self.post_to_wordpress)
@@ -338,7 +321,6 @@ class BrowserApp(QMainWindow):
         self.tabs.addTab(self.wp_html_tab, "WordPress HTML")
 
         self.setCentralWidget(self.tabs)
-        self.update_generate_article_button_state()
 
     def post_to_wordpress(self):
         # Check if post title is empty
@@ -356,7 +338,7 @@ class BrowserApp(QMainWindow):
             data = {
                 "title": self.post_title_entry.text(),
                 "content": self.wp_html_content.toPlainText(),
-                "status": "draft",
+                "status": "published",
                 "categories": [self.category_dropdown.currentData()],
                 "tags": tag_ids
             }
