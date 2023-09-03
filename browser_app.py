@@ -338,7 +338,7 @@ class BrowserApp(QMainWindow):
             data = {
                 "title": self.post_title_entry.text(),
                 "content": self.wp_html_content.toPlainText(),
-                "status": "published",
+                "status": "publish",
                 "categories": [self.category_dropdown.currentData()],
                 "tags": tag_ids
             }
@@ -645,85 +645,7 @@ class BrowserApp(QMainWindow):
                 </div>
             """
 
-        wp_html = f"""
-            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.1/css/all.min.css">
-            <style>
-                *, *::before, *::after {{
-                    box-sizing: border-box;
-                }}
-                .product-container {{
-                    width: 100%;
-                    border: 1px solid #ddd;
-                    padding: 20px;
-                    font-family: Arial, sans-serif;
-                    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-                    margin: 20px auto;
-                    position: relative;
-                }}
-                .product-ribbon {{
-                    position: absolute;
-                    left: 0; top: 0;
-                    z-index: 1;
-                    background-color: #FF6347;
-                    color: white;
-                    padding: 5px 15px;
-                    font-size: 14px;
-                    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-                }}
-                .product-image {{
-                    width: 100%;
-                    height: auto;
-                    display: block;
-                    margin-bottom: 20px;
-                }}
-                .product-link {{
-                    text-decoration: none;
-                    color: inherit;
-                }}
-                .product-name {{
-                    font-size: 20px;
-                    font-weight: bold;
-                    margin-bottom: 15px;
-                }}
-                .product-price-reviews {{
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    margin-bottom: 15px;
-                }}
-                .product-price {{
-                    font-size: 18px;
-                    color: #555;
-                    font-weight: bold;
-                }}
-                .product-reviews {{
-                    font-size: 16px;
-                    color: #777;
-                }}
-                .product-bullet-points {{
-                    list-style-type: decimal;
-                    padding-left: 20px;
-                    margin-bottom: 20px;
-                }}
-                .view-on-amazon {{
-                    display: block;
-                    width: 100%;
-                    padding: 12px; 
-                    background-color: #FEBD69;
-                    text-align: center;
-                    color: white;
-                    text-decoration: none;
-                    border-radius: 4px;
-                    font-size: 18px; 
-                }}
-                .view-on-amazon:hover {{
-                    background-color: #f5a623;
-                }}
-            </style>
-            {product_boxes_html}
-        """
-
-        self.wp_html_content.setPlainText(wp_html)
+        self.wp_html_content.setPlainText(product_boxes_html)
 
         # Automatically render the WordPress HTML
         self.render_html_content()
