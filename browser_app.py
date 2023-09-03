@@ -2,10 +2,12 @@ import base64
 import json
 import os
 import re
-
 import openai
 import requests
 import markdown2
+import nltk
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
 from PyQt5.QtWidgets import (QMainWindow, QLineEdit, QPushButton, QVBoxLayout, QHBoxLayout,
                              QWidget, QTextEdit, QTabWidget, QDesktopWidget, QTableWidget, QTableWidgetItem,
                              QMessageBox, QComboBox, QLabel, QFormLayout)
@@ -38,6 +40,25 @@ class BrowserApp(QMainWindow):
         self.browser.urlChanged.connect(self.update_url_textbox)
         self.cache_file = "product_cache.json"
         self.product_cache = self.load_cache()
+
+    def extract_tags_from_content(self, content):
+        nltk.download('punkt')
+        nltk.download('stopwords')
+        stop_words = set(stopwords.words('english'))
+
+        # Tokenize the content
+        word_tokens = word_tokenize(content)
+
+        # Remove stopwords and non-alphabetic tokens
+        filtered_tokens = [w for w in word_tokens if w.isalpha() and w.lower() not in stop_words]
+
+        # Get the frequency distribution
+        freq_dist = nltk.FreqDist(filtered_tokens)
+
+        # Get the top 10 most common words as tags
+        tags = [word for word, freq in freq_dist.most_common(10)]
+
+        return tags
 
     def update_generate_article_button_state(self):
         if not self.wp_html_content.toPlainText().strip():
@@ -81,13 +102,17 @@ class BrowserApp(QMainWindow):
             article_content = markdown2.markdown(response.choices[0].message.content)
 
             # Extract the <h1> heading from the generated content
-            h1_heading = re.search(r"<h1.*?>.*?</h1>", article_content)
+            h1_heading = re.search(r"<h1.*?>(.*?)</h1>", article_content)
             if h1_heading:
-                h1_heading = h1_heading.group()
-                article_content = article_content.replace(h1_heading, "")
+                h1_text = h1_heading.group(1)  # Extract the text inside the <h1> tags
+                self.post_title_entry.setText(h1_text)  # Set the extracted title as the post title
+                article_content = article_content.replace(h1_heading.group(0),
+                                                          "")  # Remove the <h1> heading from the article content
+            else:
+                h1_text = ""
 
             # Combine the <h1> heading, current content, and the rest of the article content
-            organized_content = h1_heading + "\n\n" + current_content + "\n\n" + article_content
+            organized_content = h1_text + "\n\n" + current_content + "\n\n" + article_content
 
             # Set the organized content back to the QTextEdit
             self.wp_html_content.setPlainText(organized_content)
@@ -271,12 +296,12 @@ class BrowserApp(QMainWindow):
 
         # Existing code
         self.show_price_checkbox = QCheckBox("Show Price", self)
-        self.show_price_checkbox.setChecked(True)
+        self.show_price_checkbox.setChecked(False)
         wp_html_layout.addWidget(self.show_price_checkbox)
 
         # Add this new checkbox
         self.show_rating_checkbox = QCheckBox("Show Rating", self)
-        self.show_rating_checkbox.setChecked(True)
+        self.show_rating_checkbox.setChecked(False)
         wp_html_layout.addWidget(self.show_rating_checkbox)
 
         self.button_text_label = QLabel("Button Text:", self)
@@ -311,11 +336,15 @@ class BrowserApp(QMainWindow):
             headers = {
                 "Authorization": f"Basic {base64.b64encode(f'{self.wp_username}:{self.wp_password}'.encode()).decode()}"
             }
+            tag_names = self.extract_tags_from_content(self.wp_html_content.toPlainText())
+            tag_ids = self.get_or_create_tags(tag_names)
+
             data = {
                 "title": self.post_title_entry.text(),
                 "content": self.wp_html_content.toPlainText(),
                 "status": "publish",
-                "categories": [self.category_dropdown.currentData()]
+                "categories": [self.category_dropdown.currentData()],
+                "tags": tag_ids
             }
             response = requests.post(api_endpoint, headers=headers, json=data)
             if response.status_code == 201:
@@ -324,6 +353,26 @@ class BrowserApp(QMainWindow):
                 QMessageBox.warning(self, "Post Failed", f"Failed to post content. Error: {response.text}")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"An error occurred: {str(e)}")
+
+    def get_or_create_tags(self, tag_names):
+        tag_ids = []
+        for tag_name in tag_names:
+            # Check if the tag exists
+            response = requests.get(f"{self.wp_site_url}/wp-json/wp/v2/tags?search={tag_name}")
+            if response.status_code == 200 and response.json():
+                tag_ids.append(response.json()[0]['id'])
+            else:
+                # If tag doesn't exist, create it
+                headers = {
+                    "Authorization": f"Basic {base64.b64encode(f'{self.wp_username}:{self.wp_password}'.encode()).decode()}"
+                }
+                data = {
+                    "name": tag_name
+                }
+                response = requests.post(f"{self.wp_site_url}/wp-json/wp/v2/tags", headers=headers, json=data)
+                if response.status_code == 201:
+                    tag_ids.append(response.json()['id'])
+        return tag_ids
 
     def fetch_categories(self):
         api_endpoint = f"{self.wp_site_url}/wp-json/wp/v2/categories"
