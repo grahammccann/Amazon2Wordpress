@@ -333,6 +333,10 @@ class BrowserApp(QMainWindow):
                 "Authorization": f"Basic {base64.b64encode(f'{self.wp_username}:{self.wp_password}'.encode()).decode()}"
             }
             tag_names = self.extract_tags_from_content(self.wp_html_content.toPlainText())
+
+            # Convert each tag to lowercase
+            tag_names = [tag.lower() for tag in tag_names]
+
             tag_ids = self.get_or_create_tags(tag_names)
 
             data = {
